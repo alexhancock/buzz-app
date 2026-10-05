@@ -1,6 +1,6 @@
 {
-  "repository": "https://github.com/block/buzz.git",
-  "revision": "4f51b9e1010e086a16c099cd8d8218ca974a5e18",
+  "repository": "https://github.com/alexhancock/buzz.git",
+  "revision": "1d18dafa9e42e99775c84fc9c53f08446d423503",
   "tools": [
     "buzz-acp",
     "buzz-agent",
@@ -13,6 +13,6 @@
     "repository": "https://github.com/aaif-goose/goose.git",
     "revision": "4dea9b483efbd2541d43500b8ed3c044c65e6d2f",
     "profile": "lean",
-    "features": "native-tls,system-keyring,online-model-meta,openssl/vendored"
+    "features": "native-tls,system-keyring,online-model-meta,openssl/vendored,live-voice"
   }
 }

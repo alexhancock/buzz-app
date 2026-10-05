@@ -26,6 +26,11 @@ import { createOutbox, PublishRejected } from "../src/features/relay/outbox.ts";
 import { createRelaySession } from "../src/features/relay/session.ts";
 import { feedbackEvent } from "../src/features/relay/product-feedback.ts";
 import { archiveRequestTemplate } from "../src/features/relay/identity-archive-protocol.ts";
+import {
+  authTemplate,
+  backingTemplate,
+  startTemplate,
+} from "../src/features/huddles/protocol.ts";
 
 // Only wall time is controlled. Real timers/performance.now still exercise HTTP admission.
 let wallClock;
@@ -3375,6 +3380,47 @@ test("inventory rejects foreign pages, ignores invalid heads and follows exact-k
         .at(-1),
     });
     expect(h.publications).toHaveLength(0);
+  } finally {
+    await h.close();
+  }
+});
+
+test("huddle routes sign only exact huddle shapes and never publish audio auth", async () => {
+  const h = await harness((call) =>
+    Response.json({ accepted: true, event_id: call.body.id }),
+  );
+  try {
+    await h.start();
+    const session = await (await fetch(`${h.base}/api/relay/session`)).json();
+    expect(session.huddles).toBe(true);
+    const backing = "0123abcd-0000-4000-8000-000000000000";
+    const parent = "11111111-1111-4111-8111-111111111111";
+    const relay = "wss://primary.example";
+    const signed = [];
+    for (const template of [
+      backingTemplate(backing),
+      startTemplate(parent, backing),
+      authTemplate(relay, "challenge"),
+    ]) {
+      const response = await h.post("huddle-sign", template);
+      expect(response.status).toBe(200);
+      const event = await response.json();
+      expect(verifyEvent(event)).toBe(true);
+      signed.push(event);
+    }
+    for (const template of [
+      authTemplate("wss://other.example", "challenge"),
+      { ...startTemplate(parent, backing), content: "{}" },
+      { kind: 9, created_at: 1700000000, content: "hi", tags: [["h", parent]] },
+    ])
+      expect((await h.post("huddle-sign", template)).status).toBe(400);
+    // The general signer stays closed to huddle audio authentication.
+    expect(
+      (await h.post("sign", authTemplate(relay, "challenge"))).status,
+    ).toBe(400);
+    expect((await h.post("huddle-publish", signed[1])).status).toBe(200);
+    expect(h.publications.at(-1)).toMatchObject({ kind: 48100 });
+    expect((await h.post("huddle-publish", signed[2])).status).toBe(400);
   } finally {
     await h.close();
   }

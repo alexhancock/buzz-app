@@ -104,8 +104,45 @@ fn member_administration(event: &EventTemplate) -> bool {
         && (event.kind == 9001
             || matches!(tag(event, 2, "role"), Some("admin" | "member" | "guest")))
 }
+/// Exact huddle backing channel (9007) and parent start (48100); audio NIP-42 uses `relay_sign`.
+fn huddle(event: &EventTemplate) -> bool {
+    let Some(id) = tag(event, 0, "h").filter(|id| uuid(id)) else {
+        return false;
+    };
+    match event.kind {
+        9007 => {
+            let expected = [
+                ["h", id],
+                ["name", &format!("huddle-{}", &id[..8])],
+                ["visibility", "private"],
+                ["channel_type", "stream"],
+                ["ttl", "3600"],
+            ];
+            common(event)
+                && event.tags.len() == expected.len()
+                && event
+                    .tags
+                    .iter()
+                    .zip(expected)
+                    .all(|(t, e)| t.as_slice() == e)
+        }
+        48100 => {
+            event.tags.len() == 1
+                && event.created_at <= i64::MAX as u64
+                && serde_json::from_str::<Value>(&event.content)
+                    .ok()
+                    .and_then(|v| v.get("ephemeral_channel_id")?.as_str().map(str::to_owned))
+                    .is_some_and(|backing| {
+                        uuid(&backing)
+                            && event.content == format!(r#"{{"ephemeral_channel_id":"{backing}"}}"#)
+                    })
+        }
+        _ => false,
+    }
+}
 fn valid(route: &str, event: &EventTemplate) -> bool {
     match route {
+        "huddle" => huddle(event),
         "channel-details" => details(event),
         "channel-lifecycle" => lifecycle(event),
         "identity-archive" => archive(event),
@@ -168,6 +205,46 @@ pub(crate) async fn relay_channel_publish(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn huddle_templates_are_exact() {
+        let id = "0123abcd-0000-4000-8000-000000000000";
+        let parent = "11111111-1111-4111-8111-111111111111";
+        let event = |kind: u16, content: String, rows: &[[&str; 2]]| EventTemplate {
+            kind,
+            created_at: 12,
+            content,
+            tags: rows
+                .iter()
+                .map(|r| r.iter().map(|v| v.to_string()).collect())
+                .collect(),
+        };
+        let backing = |visibility: &str, name: &str| {
+            event(
+                9007,
+                String::new(),
+                &[
+                    ["h", id],
+                    ["name", name],
+                    ["visibility", visibility],
+                    ["channel_type", "stream"],
+                    ["ttl", "3600"],
+                ],
+            )
+        };
+        assert!(valid("huddle", &backing("private", "huddle-0123abcd")));
+        assert!(!valid("huddle", &backing("open", "huddle-0123abcd")));
+        assert!(!valid("huddle", &backing("private", "Team")));
+        let start = |kind: u16, content: String| event(kind, content, &[["h", parent]]);
+        let content = format!(r#"{{"ephemeral_channel_id":"{id}"}}"#);
+        assert!(valid("huddle", &start(48100, content.clone())));
+        assert!(!valid(
+            "huddle",
+            &start(48100, format!(r#"{{"ephemeral_channel_id":"{id}","x":1}}"#))
+        ));
+        assert!(!valid("huddle", &start(9, content.clone())));
+        assert!(!valid("channel-lifecycle", &start(48100, content)));
+    }
+
     #[test]
     fn purpose_bound_templates() {
         let mut event = EventTemplate {

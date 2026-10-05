@@ -63,6 +63,13 @@ import {
   type RelayEvent,
 } from "./events";
 
+/** Huddle backing/start signing (9007, 48100) and audio-endpoint NIP-42 (22242) only. */
+export type HuddleHost = Readonly<{
+  /** ws(s)://host: the audio endpoint base and the exact NIP-42 `relay` tag. */
+  relayUrl: string;
+  writer: RelayWriter;
+  query: ReadTransport["query"];
+}>;
 /** Relay connection. Implementations verify signatures; callers never see raw JSON. */
 export interface RelayWriter {
   readonly kinds?: readonly number[];
@@ -100,6 +107,8 @@ export interface ReadTransport {
   readonly memberAdministration?: RelayWriter;
   /** Narrow NIP-IA 9035/9036 signer/publisher; never supplied to the message outbox. */
   readonly identityArchive?: RelayWriter;
+  /** Purpose-bound huddle start/audio authentication; never supplied to the outbox. */
+  readonly huddle?: HuddleHost;
   /** Purpose-bound observer decoding on the shared host live stream. */
   readonly agentActivity?: boolean;
   readonly activityArchive?: ArchiveHost;
@@ -390,6 +399,7 @@ export async function connectBrokerTransport(
     channelDetails?: boolean;
     memberAdministration?: boolean;
     identityArchives?: boolean;
+    huddles?: boolean;
     relayUrl?: string;
     relayHttpUrl?: string;
     live?: boolean;
@@ -453,6 +463,39 @@ export async function connectBrokerTransport(
       return acceptPublish(response, event.id);
     },
   });
+  const query: ReadTransport["query"] = (
+    filters,
+    signal,
+    requestId = "read",
+    priority = "foreground",
+  ) =>
+    measureQuery(endpoint, priority, async (sized) => {
+      const result = await fetch(`${endpoint}/query`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Buzz-Read-Priority": priority,
+        },
+        body: JSON.stringify(filters),
+        signal: signal ?? null,
+      });
+      if (!result.ok) {
+        const failure = await readApiFailure(result);
+        throw new ReadError(
+          result.status === 401 || result.status === 403
+            ? "denied"
+            : "unavailable",
+          failure.error,
+          result.status,
+          failure.retryAfterMs,
+        );
+      }
+      recordServerTiming(result, profiling, requestId);
+      return profiling.measureAsync("read.verify", requestId, async () =>
+        parseEvents(JSON.parse(sized(await result.text())), verify, signal),
+      );
+    });
   return {
     profiling,
     ...(session.attachmentUploads === true && session.relayUrl
@@ -894,6 +937,15 @@ export async function connectBrokerTransport(
     ...(session.identityArchives === true
       ? { identityArchive: routeWriter("identity-archive") }
       : {}),
+    ...(session.huddles === true && relayHttpUrl
+      ? {
+          huddle: {
+            relayUrl: relayHttpUrl.replace(/^http/, "ws"),
+            writer: routeWriter("huddle"),
+            query,
+          },
+        }
+      : {}),
     ...(session.sidebarPreferenceWrites
       ? {
           async writeSidebarAssignment(intent, signal) {
@@ -1010,34 +1062,7 @@ export async function connectBrokerTransport(
         session.relayUrl,
         size,
       ),
-    query: (filters, signal, requestId = "read", priority = "foreground") =>
-      measureQuery(endpoint, priority, async (sized) => {
-        const result = await fetch(`${endpoint}/query`, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Buzz-Read-Priority": priority,
-          },
-          body: JSON.stringify(filters),
-          signal: signal ?? null,
-        });
-        if (!result.ok) {
-          const failure = await readApiFailure(result);
-          throw new ReadError(
-            result.status === 401 || result.status === 403
-              ? "denied"
-              : "unavailable",
-            failure.error,
-            result.status,
-            failure.retryAfterMs,
-          );
-        }
-        recordServerTiming(result, profiling, requestId);
-        return profiling.measureAsync("read.verify", requestId, async () =>
-          parseEvents(JSON.parse(sized(await result.text())), verify, signal),
-        );
-      }),
+    query,
   };
 }
 

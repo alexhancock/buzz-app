@@ -582,7 +582,7 @@ checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 [[package]]
 name = "buzz-agent"
 version = "0.1.0"
-source = "git+https://github.com/block/buzz.git?rev=4f51b9e1010e086a16c099cd8d8218ca974a5e18#4f51b9e1010e086a16c099cd8d8218ca974a5e18"
+source = "git+https://github.com/alexhancock/buzz.git?rev=1d18dafa9e42e99775c84fc9c53f08446d423503#1d18dafa9e42e99775c84fc9c53f08446d423503"
 dependencies = [
  "arc-swap",
  "async-trait",

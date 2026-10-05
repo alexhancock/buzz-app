@@ -1,0 +1,136 @@
+@reference "../../shared/styles/globals.css";
+
+/* A small always-on-top call window; not modal, so the channel stays usable. */
+.window {
+  @apply floating-surface;
+  position: fixed;
+  right: max(var(--space-4), env(safe-area-inset-right));
+  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  z-index: calc(var(--layer-dialog-backdrop) - 1);
+  display: flex;
+  flex-direction: column;
+  width: min(18rem, calc(100vw - 2 * var(--space-4)));
+  color: var(--text-standard);
+}
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) 0;
+  min-width: 0;
+}
+.title {
+  @apply text-label-sm;
+}
+.subtitle {
+  @apply text-caption;
+  overflow: hidden;
+  color: var(--text-metadata);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 9rem;
+  padding: var(--space-4) var(--space-3);
+}
+.participant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 4rem;
+  animation: float 4s ease-in-out infinite alternate;
+  animation-delay: calc(var(--index) * -1.3s);
+}
+.avatar {
+  position: relative;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-pill);
+  transition: box-shadow var(--duration-state) var(--easing-state);
+}
+.participant[data-speaking] .avatar {
+  box-shadow:
+    0 0 0 2px var(--border-accent),
+    0 0 0 0.5rem color-mix(in srgb, var(--border-accent) 25%, transparent);
+}
+/* Speech bubble (body + tail dot) that pops out of the speaker's corner. */
+.participant[data-speaking] .avatar::before,
+.participant[data-speaking] .avatar::after {
+  position: absolute;
+  border-radius: var(--radius-pill);
+  background: var(--affordance-accent-prominent);
+  content: "";
+  pointer-events: none;
+  animation: bubble 1.2s ease-out infinite;
+}
+.participant[data-speaking] .avatar::before {
+  top: -0.5rem;
+  right: -0.625rem;
+  width: 0.875rem;
+  height: 0.75rem;
+}
+.participant[data-speaking] .avatar::after {
+  top: 0.25rem;
+  right: -0.125rem;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  animation-delay: -0.08s;
+}
+@keyframes bubble {
+  0% {
+    opacity: 0;
+    transform: translate(-0.25rem, 0.25rem) scale(0.3);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0.375rem, -0.75rem) scale(1.1);
+  }
+}
+.name {
+  @apply text-caption;
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--text-subtle);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status {
+  @apply text-caption;
+  padding: 0 var(--space-3);
+  color: var(--text-metadata);
+  text-align: center;
+}
+.status[data-error] {
+  color: var(--text-danger);
+}
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+@keyframes float {
+  from {
+    transform: translateY(-0.25rem);
+  }
+  to {
+    transform: translateY(0.25rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .participant,
+  .participant[data-speaking] .avatar::before,
+  .participant[data-speaking] .avatar::after {
+    animation: none;
+  }
+}

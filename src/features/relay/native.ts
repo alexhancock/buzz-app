@@ -25,6 +25,7 @@ import {
 import type { RelayWriter } from "./transport";
 import { communityGitRepository } from "../projects/git";
 import { validateLifecycleTemplate } from "./channel-lifecycle-protocol";
+import { validateHuddleTemplate } from "../huddles/protocol";
 import { validateMemberAdministrationTemplate } from "../channel-members/administration-protocol";
 import { validateDetailsTemplate } from "./channel-details-protocol";
 import { validateArchiveRequestTemplate } from "./identity-archive-protocol";
@@ -299,6 +300,7 @@ export async function connectNativeTransport(
     route:
       | "channel-details"
       | "channel-lifecycle"
+      | "huddle"
       | "identity-archive"
       | "member-administration",
     validate: (event: EventTemplate) => void,
@@ -420,6 +422,30 @@ export async function connectNativeTransport(
       "identity-archive",
       validateArchiveRequestTemplate,
     ),
+    huddle: (() => {
+      // Same NIP-42 relay tag as the shared live socket.
+      const relayUrl = origin.replace(/^http/, "ws");
+      const validate = (event: EventTemplate) =>
+        validateHuddleTemplate(event, relayUrl);
+      const commands = commandWriter("huddle", validate);
+      return {
+        relayUrl,
+        query: transport.query,
+        writer: {
+          // Audio NIP-42 uses the existing community-checked 22242 signer.
+          async sign(event: EventTemplate, signal: AbortSignal) {
+            validate(event);
+            if (event.kind !== 22242) return commands.sign(event, signal);
+            const result = await writer.sign(event, signal);
+            validate(result);
+            if (result.pubkey !== transport.viewer)
+              throw new Error("Invalid huddle command");
+            return result;
+          },
+          publish: commands.publish,
+        },
+      };
+    })(),
     async openDirectMessage(pubkeys, signal) {
       signal.throwIfAborted();
       const id = await invoke<string>("relay_direct_message", {

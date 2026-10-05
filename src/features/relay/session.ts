@@ -1535,6 +1535,8 @@ export function createRelaySession(
     relayAuthor: transport?.relayAuthor,
     authorizeAgentLog: transport?.authorizeAgentLog,
     authorizeGit: transport?.authorizeGit,
+    /** Purpose-bound huddle host; the huddle controller owns its socket lifetime. */
+    huddle: transport?.huddle,
     scope: readScope,
     /** Verified new live-route messages, after reconciliation. Never history or local intent. */
     subscribeIncoming(listener: IncomingListener) {

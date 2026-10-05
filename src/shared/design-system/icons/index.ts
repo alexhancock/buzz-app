@@ -231,6 +231,12 @@ export const VideoConferenceIcon = defineIcon(
   "tabler",
   TablerVideoConferenceIcon,
 );
+import TablerMicrophoneIcon from "@tabler/icons-react/dist/esm/icons/IconMicrophone.mjs";
+export const MicrophoneIcon = defineIcon("tabler", TablerMicrophoneIcon);
+import TablerMicrophoneOffIcon from "@tabler/icons-react/dist/esm/icons/IconMicrophoneOff.mjs";
+export const MicrophoneOffIcon = defineIcon("tabler", TablerMicrophoneOffIcon);
+import TablerPhoneOffIcon from "@tabler/icons-react/dist/esm/icons/IconPhoneOff.mjs";
+export const PhoneOffIcon = defineIcon("tabler", TablerPhoneOffIcon);
 import TablerWebhooksLogoIcon from "@tabler/icons-react/dist/esm/icons/IconWebhook.mjs";
 export const WebhooksLogoIcon = defineIcon("tabler", TablerWebhooksLogoIcon);
 import TablerWrenchIcon from "@tabler/icons-react/dist/esm/icons/IconTool.mjs";

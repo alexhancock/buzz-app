@@ -31,6 +31,7 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { useChannelPanels } from "./useChannelPanels";
 import { ChannelHeaderMenu } from "./ChannelHeaderMenu";
+import { HuddleButton, HuddleWindow } from "./HuddleWindow";
 import { ChannelSettingsPanel } from "./ChannelSettingsPanel";
 import { ChannelJoinNotice } from "./ChannelJoinNotice";
 import { ChannelLifecycleActions } from "./ChannelLifecycleActions";
@@ -1420,6 +1421,11 @@ function ChannelWorkspace({
   );
   const workspace = (
     <div ref={split.ref} style={split.style} className={styles.board}>
+      <HuddleWindow
+        session={queries}
+        channels={channels}
+        agentControl={agentControl}
+      />
       {current && membersOpen && (
         <ChannelMembersDialog
           key={current.id}
@@ -1535,6 +1541,15 @@ function ChannelWorkspace({
                   }
                   actions={
                     <>
+                      {current &&
+                        queries.huddle &&
+                        !current.readOnly &&
+                        !current.archived && (
+                          <HuddleButton
+                            session={queries}
+                            channelId={current.id}
+                          />
+                        )}
                       {current && (
                         <IconButton
                           size="sm"

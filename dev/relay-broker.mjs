@@ -20,6 +20,7 @@ import { validateMemberAdministrationTemplate } from "../src/features/channel-me
 import { validateLifecycleTemplate } from "../src/features/relay/channel-lifecycle-protocol.ts";
 import { validateDetailsTemplate } from "../src/features/relay/channel-details-protocol.ts";
 import { validateArchiveRequestTemplate } from "../src/features/relay/identity-archive-protocol.ts";
+import { validateHuddleTemplate } from "../src/features/huddles/protocol.ts";
 import {
   prepareChannelKit,
   decodeChannelKit,
@@ -1351,6 +1352,7 @@ export function relayBrokerPlugin({
                 ...((await getAuthority(relay)).channelCreation ? [9007] : []),
               ],
               channelLifecycle: true,
+              huddles: true,
               channelDetails: true,
               memberAdministration: true,
               identityArchives: true,
@@ -1900,6 +1902,8 @@ export function relayBrokerPlugin({
               "/api/relay/channel-lifecycle-publish",
               "/api/relay/identity-archive-sign",
               "/api/relay/identity-archive-publish",
+              "/api/relay/huddle-sign",
+              "/api/relay/huddle-publish",
               "/api/relay/publish",
               "/api/relay/read-state-sign",
               "/api/relay/channel-kit-prepare",
@@ -2365,20 +2369,37 @@ export function relayBrokerPlugin({
           const archive =
             route === "/api/relay/identity-archive-sign" ||
             route === "/api/relay/identity-archive-publish";
+          const huddle =
+            route === "/api/relay/huddle-sign" ||
+            route === "/api/relay/huddle-publish";
           const signing =
+            route === "/api/relay/huddle-sign" ||
             route === "/api/relay/sign" ||
             route === "/api/relay/channel-details-sign" ||
             route === "/api/relay/member-administration-sign" ||
             route === "/api/relay/channel-lifecycle-sign" ||
             route === "/api/relay/identity-archive-sign";
           const publishing =
+            route === "/api/relay/huddle-publish" ||
             route === "/api/relay/publish" ||
             route === "/api/relay/channel-details-publish" ||
             route === "/api/relay/member-administration-publish" ||
             route === "/api/relay/channel-lifecycle-publish" ||
             route === "/api/relay/identity-archive-publish";
           if (signing || publishing) {
-            if (administration) {
+            if (huddle) {
+              try {
+                validateHuddleTemplate(filters, relay.replace(/^http/, "ws"));
+                // Audio authentication is signed for the browser's socket, never published.
+                if (publishing && filters.kind === 22242)
+                  throw new Error("Not publishable");
+              } catch {
+                return json(res, 400, {
+                  error: "Invalid huddle command",
+                  sent: false,
+                });
+              }
+            } else if (administration) {
               try {
                 validateMemberAdministrationTemplate(filters, viewer);
               } catch {
